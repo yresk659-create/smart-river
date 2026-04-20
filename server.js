@@ -6,13 +6,31 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ===== LOAD DATABASE =====
 let db = JSON.parse(fs.readFileSync('db.json'));
+
+// ===== ROOT (BIAR GAK NOT FOUND) =====
+app.get('/', (req, res) => {
+  res.json({
+    name: "smart-river",
+    status: "running",
+    endpoints: [
+      "/api/sungai",
+      "/api/devices",
+      "/login",
+      "/verify",
+      "/control"
+    ]
+  });
+});
 
 // ===== LOGIN =====
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
 
-  let user = db.users.find(u => u.username === username && u.password === password);
+  let user = db.users.find(
+    u => u.username === username && u.password === password
+  );
 
   if (!user) return res.status(401).send('Login gagal');
 
@@ -22,6 +40,7 @@ app.post('/login', (req, res) => {
   res.send('OTP dikirim');
 });
 
+// ===== VERIFY OTP =====
 app.post('/verify', (req, res) => {
   const { username, otp } = req.body;
 
@@ -43,29 +62,36 @@ app.get('/api/devices', (req, res) => {
   res.json(db.devices);
 });
 
-// ===== CONTROL =====
-let controlSession = false;
+// ===== CONTROL PER DEVICE =====
+let controlSession = {};
 
 app.post('/control', (req, res) => {
-  let device = db.devices[0];
+  const { deviceName } = req.body;
+
+  let device = db.devices.find(d => d.name === deviceName);
+
+  if (!device) return res.status(404).send("Device tidak ditemukan");
 
   if (device.status !== "ERROR") {
-    return res.send("Tidak bisa kontrol");
+    return res.send("Tidak bisa kontrol (tidak error)");
   }
 
-  if (controlSession) {
+  if (controlSession[deviceName]) {
     return res.send("Sedang dikontrol");
   }
 
-  controlSession = true;
+  controlSession[deviceName] = true;
 
   setTimeout(() => {
-    controlSession = false;
+    controlSession[deviceName] = false;
   }, 1800000); // 30 menit
 
-  res.send("Kontrol aktif 30 menit");
+  res.send("Kontrol aktif 30 menit untuk " + deviceName);
 });
 
-app.listen(3000, '0.0.0.0', () => {
-  console.log("Server jalan di 3000");
+// ===== PORT (WAJIB UNTUK REPLIT) =====
+const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log("Server jalan di " + PORT);
 });
